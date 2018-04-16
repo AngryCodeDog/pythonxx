@@ -119,7 +119,7 @@ def req_subject(msg):
         # 去注册信息
         logger.info('to import subject')
         photo_ids = [data['data']['id']]
-        subject_data = import_subject(0, msg['name'], msg.get('gender', 0), msg.get(
+        subject_data = import_subject(0, msg.get('name',''), msg.get('gender', 0), msg.get(
             'company', ''), msg.get('title', ''), msg.get('remark', ''), photo_ids, msg.get('phone', ''))
         if subject_data['code'] == 0:
             result_content = {}
