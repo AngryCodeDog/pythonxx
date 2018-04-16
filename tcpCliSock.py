@@ -110,8 +110,7 @@ def req_subject(msg):
     photo_base64str = msg['photo_base64str']  # 取出图片base64str
     image_byte = base64.b64decode(photo_base64str)  # 转成图片二进制数据
     logger.info('to import photo')
-    data = reqest_subjetc_photo(image_byte, msg.get(
-        'subject_id', None), msg.get('photo_id', None))  # 请求盒子 判断识别照片
+    data = reqest_subjetc_photo(image_byte)  # 请求盒子 判断识别照片
 
     result = {}
     print data
