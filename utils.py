@@ -17,7 +17,7 @@ headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36",
     "host": "192.168.1.50",
     "referer": "http://192.168.1.50/",
-    "cookie": "session=aff8d471-f391-4123-8b1b-c09b7996213d",
+    "cookie": "session=1e479321-1cd6-4ba4-ae2e-31f2cad499af",
 }
 
 BASE_URL = 'http://192.168.1.50'
@@ -95,9 +95,10 @@ def req_update_subject(subject_id,req_data):
     """请求更新个人信息"""
     try:
         url = BASE_URL + '/subject/'+str(subject_id)
-        params = {'name':req_data.get('name',''),'title':req_data.get('title',''),
-        'department':req_data.get('company',''),'phone':req_data.get('phone',''),
-        'gender':req_data.get('gender',0),'remark':req_data.get('course',''),'photo_ids':req_data.get('photo_ids',[])}
+        # params = {'name':req_data.get('name',''),'title':req_data.get('title',''),
+        # 'department':req_data.get('company',''),'phone':req_data.get('phone',''),
+        # 'gender':req_data.get('gender',0),'remark':req_data.get('course',''),'photo_ids':req_data.get('photo_ids',[])}
+        params = get_update_subject_params(req_data)
         logger.info(json.dumps(params))
         data = requests.put(url,json=params,headers=headers).json()
         print data
@@ -107,6 +108,17 @@ def req_update_subject(subject_id,req_data):
     return error_result()
 
 
+def get_update_subject_params(req_data):
+    params = {}
+    for key,value in req_data.items():
+        if key == 'company':
+            params['department'] = value
+        if key == 'photo_id':
+            params['photo_ids'] = [value]
+        params[key] = value
+    
+    return params
+        
 def recognize(img_byte):
     """
     img_byte 图片二进制数据
@@ -130,8 +142,8 @@ def get_subject_brief_info(subject):
     result_content['title'] = subject['title']
     result_content['gender'] = subject['gender']
     result_content['subject_id'] = subject['id']
-    result_content['course'] = subject['remark']
-    result_content['photo_id'] = [x['id'] for x in subject['photos']]
+    result_content['remark'] = subject['remark']
+    result_content['photo_id'] = subject['photos'][0]['id']
     return result_content
 
 
@@ -173,10 +185,11 @@ def error_result(error=ErrorCode.ERROR_UNKNOWN,data={}, with_code=False):
     }
     return ret
 
-def succeed_result(data={}):
+def succeed_result(data={},desc=''):
     ret = {
         'code': 0,
-        'data': data,
+        'data': {},
+        'desc': desc
     }
     return ret
 

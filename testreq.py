@@ -40,18 +40,21 @@ def writefiel(json_str):
 
 def del_subject_test():
     try:
-        url = BASE_URL + '/operation/subject'+'/176'
-        data = requests.delete(url)
+        url = BASE_URL + '/operation/subject'+'/139'
+        proxies = {'http': None, 'https': None}
+        data = requests.delete(url,proxies=proxies)
+        
         print json.loads(data.content,encoding='utf-8')
     except Exception as e:
         logger.exception(e)
 
 def update_subject():
     try:
-        url = BASE_URL + '/operation/subject'+'/176'
-        file = {'image':('filename.jpg',open('zyp2.jpg','rb'))}
-        params = {"name":"zhuyupei","phone":"123456","company":"阿里","title":"开发","course":"演讲课","subject_id":175,"photo_ids":[204]}
-        data = requests.put(url, json=params)
+        url = BASE_URL + '/operation/subject/140'
+        # file = {'image':('filename.jpg',open('zyp2.jpg','rb'))}
+        params = {"name":"朱宇培","company":"阿里","remark":"演讲课"}
+        proxies = {'http': None, 'https': None}
+        data = requests.put(url, json=params,proxies=proxies)
         
         print data.content
     except Exception as e:
@@ -72,4 +75,4 @@ def req_update_subject(subject_id,req_data):
         logger.exception(e)
 
 if __name__ == "__main__":
-    del_subject_test()
+    update_subject()

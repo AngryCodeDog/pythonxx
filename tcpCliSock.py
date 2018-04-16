@@ -81,10 +81,21 @@ def handle_request(req_data):
     elif req_data['type'] == 'del_subject':
         data_temp = req_del_subject(req_data['data']['subject_id'])
         if data_temp['code'] == 0:
-            return succeed_result('delete succeed')
+            return succeed_result(desc='deleted succeed')
+        else:
+            return data_temp
+    elif req_data['type'] == 'get_subject':
+        data_temp = req_subject_info(req_data['data']['subject_id'])
+        if data_temp['code'] == 0:
+            data['code'] = 0
+            data['data'] = get_subject_brief_info(data_temp['data'])
+            return data
         else:
             return data_temp
     elif req_data['type'] == 'update_subject':
+        # if not req_data['data'].get('photo_base64str','') == '':
+        #     image_byte = base64.b64decode(req_data['data'].get('photo_base64str',''))
+        #     reqest_subjetc_photo(image_byte,req_data['data']['subject_id'],req_data['data']['photo_ids'])
         data_temp = req_update_subject(req_data['data']['subject_id'],req_data['data'])
         if data_temp['code'] == 0:
             data['code'] = 0
@@ -110,7 +121,7 @@ def req_subject(msg):
         logger.info('to import subject')
         photo_ids = [data['data']['id']]
         subject_data = import_subject(0, msg['name'], msg.get('gender', 0), msg.get(
-            'company', ''), msg.get('title', ''), msg.get('course', ''), photo_ids, msg.get('phone', ''))
+            'company', ''), msg.get('title', ''), msg.get('remark', ''), photo_ids, msg.get('phone', ''))
         if subject_data['code'] == 0:
             result_content = {}
             subject_temp = subject_data['data']
@@ -119,9 +130,9 @@ def req_subject(msg):
             result_content['title'] = subject_temp['title']
             result_content['gender'] = subject_temp['gender']
             result_content['subject_id'] = subject_temp['id']
-            result_content['course'] = subject_temp['remark']
+            result_content['remark'] = subject_temp['remark']
             result_content['phone'] = subject_temp['phone']
-            result_content['photo_id'] = photo_ids
+            result_content['photo_id'] = photo_ids[0]
             result['code'] = 0
             result['data'] = result_content
         else:
