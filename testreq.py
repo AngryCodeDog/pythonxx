@@ -4,19 +4,18 @@ from logger import logger
 import json
 
 
-BASE_URL = 'http://www.ztdface.com'
-# BASE_URL = 'http://127.0.0.1:5000'
+# BASE_URL = 'http://www.ztdface.com'
+BASE_URL = 'http://127.0.0.1:5000'
 
 headers = {
     "version": "HTTP/1.1",
-    "accept": "application/json",
     "accept-encoding": "gzip, deflate",
     "accept-language": "zh-CN,zh;q=0.9",
     "cache-control": "no-cache",
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36",
     "host": "192.168.1.50",
     "referer": "http://192.168.1.50/",
-    "cookie": "session=deaeafb6-88cb-437b-b9d1-4f9bf52375b4",
+    "cookie": "session=1e479321-1cd6-4ba4-ae2e-31f2cad499af",
 }
 
 def req_recognize():
@@ -74,5 +73,15 @@ def req_update_subject(subject_id,req_data):
     except Exception as e:
         logger.exception(e)
 
+
+def req_update_photo():
+    url = BASE_URL + '/subject/photo'
+    params = {"subject_id":149,"photo_id":186}
+    file = {"image":("filename.jpg",open('zyp2.jpg','rb'))}
+    data = requests.post(url,data=params,files=file,headers=headers).json()
+    print data
+    return data
+
+
 if __name__ == "__main__":
-    update_subject()
+    req_update_photo()

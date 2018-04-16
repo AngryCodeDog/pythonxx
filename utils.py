@@ -30,9 +30,11 @@ def reqest_subjetc_photo(img_byte, subject_id=None, photo_id=None, rect={}):
         # 如果传这个参数就可以更新图片，如果不传则是新上传图片
         params = {"subject_id": subject_id, "old_photo_id": photo_id}
         files = {'photo': ('filename.jpg', img_byte)}
-        logger.info(json.dumps(params))
         data = requests.post(
             url, data=params, headers=headers, files=files).json()
+        logger.info(data)
+        if data.get('code',-1) == 0:
+            return succeed_result(data={"subject_id":subject_id,"photo_id":data['data']['id']})
         return data
     except Exception as e:
         logger.exception(e)
@@ -74,8 +76,14 @@ def req_subject_info(subject_id):
     """请求个人信息"""
     try:
         url = BASE_URL + '/subject/'+str(subject_id)
-        data = requests.get(url,headers=headers).json()
-        return data
+        data_temp = requests.get(url,headers=headers).json()
+        data = {}
+        if data_temp['code'] == 0:
+            return succeed_result(data=get_subject_brief_info(data_temp['data']))
+        else:
+            logger.info(data)
+            data = data_temp
+            return data
     except Exception as e:
         logger.exception(e)
     return error_result()
@@ -85,8 +93,11 @@ def req_del_subject(subject_id):
     try:
         url = BASE_URL + '/subject/'+str(subject_id)
         data = requests.delete(url,headers=headers).json()
-        print data
-        return data
+        if data['code'] == 0:
+            return succeed_result(desc='deleted succeed')
+        else:
+            logger.info(data)
+            return data
     except Exception as e:
         logger.exception(e)
     return error_result()
@@ -115,7 +126,8 @@ def get_update_subject_params(req_data):
             params['department'] = value
         if key == 'photo_id':
             params['photo_ids'] = [value]
-        params[key] = value
+        else:
+            params[key] = value
     
     return params
         
@@ -188,7 +200,7 @@ def error_result(error=ErrorCode.ERROR_UNKNOWN,data={}, with_code=False):
 def succeed_result(data={},desc=''):
     ret = {
         'code': 0,
-        'data': {},
+        'data': data,
         'desc': desc
     }
     return ret

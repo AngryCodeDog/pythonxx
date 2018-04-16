@@ -15,8 +15,8 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 
-IP = '119.23.238.194'
-# IP = '127.0.0.1'
+# IP = '119.23.238.194'
+IP = '127.0.0.1'
 PORT = 21356
 
 
@@ -70,39 +70,26 @@ def handle_request(req_data):
     """
     判断是要去注册还是识别个人
     """
+
+    logger.info('handle_request: ' + req_data.get('type',''))
     data = {}
     if req_data['type'] == 'subject':
         data = req_subject(req_data['data'])
         if data.get('code',None) == 0:
             return data
     elif req_data['type'] == 'recognize':
-        data = req_recognize(req_data)
-        return data
+        return req_recognize(req_data)
     elif req_data['type'] == 'del_subject':
-        data_temp = req_del_subject(req_data['data']['subject_id'])
-        if data_temp['code'] == 0:
-            return succeed_result(desc='deleted succeed')
-        else:
-            return data_temp
+        return req_del_subject(req_data['data']['subject_id'])
     elif req_data['type'] == 'get_subject':
-        data_temp = req_subject_info(req_data['data']['subject_id'])
-        if data_temp['code'] == 0:
-            data['code'] = 0
-            data['data'] = get_subject_brief_info(data_temp['data'])
-            return data
-        else:
-            return data_temp
+        return req_subject_info(req_data['data']['subject_id'])
     elif req_data['type'] == 'update_subject':
-        # if not req_data['data'].get('photo_base64str','') == '':
-        #     image_byte = base64.b64decode(req_data['data'].get('photo_base64str',''))
-        #     reqest_subjetc_photo(image_byte,req_data['data']['subject_id'],req_data['data']['photo_ids'])
-        data_temp = req_update_subject(req_data['data']['subject_id'],req_data['data'])
-        if data_temp['code'] == 0:
-            data['code'] = 0
-            data['data'] = get_subject_brief_info(data_temp['data'])
-            return data
-        else:
-            return data
+        return update_subject(req_data)
+    elif req_data['type'] == 'update_photo':
+        return reqest_subjetc_photo(base64.b64decode(req_data['data']['photo_base64str']),
+                                            req_data['data']['subject_id'],
+                                            req_data['data']['photo_id'])
+        
     return error_result()
             
 
@@ -111,58 +98,40 @@ def req_subject(msg):
     image_byte = base64.b64decode(photo_base64str)  # 转成图片二进制数据
     logger.info('to import photo')
     data = reqest_subjetc_photo(image_byte)  # 请求盒子 判断识别照片
-
     result = {}
-    print data
-
     if data.get('code',None) == 0:
         # 去注册信息
         logger.info('to import subject')
-        photo_ids = [data['data']['id']]
-        subject_data = import_subject(0, msg['name'], msg.get('gender', 0), msg.get(
-            'company', ''), msg.get('title', ''), msg.get('remark', ''), photo_ids, msg.get('phone', ''))
+        subject_data = import_subject(0, msg.get('name',''), msg.get('gender', 0), msg.get(
+            'company', ''), msg.get('title', ''), msg.get('remark', ''), [data['data']['photo_id']], msg.get('phone', ''))
         if subject_data['code'] == 0:
-            result_content = {}
-            subject_temp = subject_data['data']
-            result_content['name'] = subject_temp['name']
-            result_content['company'] = subject_temp['department']
-            result_content['title'] = subject_temp['title']
-            result_content['gender'] = subject_temp['gender']
-            result_content['subject_id'] = subject_temp['id']
-            result_content['remark'] = subject_temp['remark']
-            result_content['phone'] = subject_temp['phone']
-            result_content['photo_id'] = photo_ids[0]
-            result['code'] = 0
-            result['data'] = result_content
+            result = succeed_result(data=get_subject_brief_info(subject_data['data']))
         else:
             result = data
-
         logger.info(json.dumps(result))
         return result
     else:
         return data
-    
-    return error_result()
 
 
 def req_recognize(req_data):
     data = recognize(base64.b64decode(req_data['data']['photo_base64str']))
-    result = {}
     if data.get('recognized',None) == True: # 如果有recognize信息，并且为ture，则识别成功
-        logger.info('req person info')
-        logger.info(data['person']['id'])
-        person_info = req_subject_info(data['person']['id'])
-        if not person_info == None:
-            result['code'] = 0
-            result['data'] = get_subject_brief_info(person_info['data'])
-            return result
+        logger.info('recognized and req person info---' + str(data['person']['id']))
+        return req_subject_info(data['person']['id'])
     elif data.get('recognized',None) == False:
-        result['code'] = 0
-        result['data'] = {"desc":"not found"}
-        return result
+        return succeed_result(desc='not found')
     else: # 其他错误信息直接返回
         return data
 
+def update_subject(req_data):
+    # 更新人物信息
+    data = {}
+    data_temp = req_update_subject(req_data['data']['subject_id'],req_data['data'])
+    if data_temp['code'] == 0:
+        return succeed_result(data=get_subject_brief_info(data_temp['data']))
+    else:
+        return data
 
 def client():
     sock = init_server()
