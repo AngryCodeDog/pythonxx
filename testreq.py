@@ -30,6 +30,19 @@ def req_recognize():
         logger.exception(e)
 
 
+def req_compare():
+    try:
+        url = 'http://192.168.1.50:8080/compare'
+        file1 = open('zrg1.jpg','rb')
+        file2 = open('zrg2.jpg','rb')
+        files = {'image_1': (file1.name.split('/')[-1], file1),
+                 'image_2': (file2.name.split('/')[-1], file2)}
+        data = requests.post(url, files=files)
+        print json.loads(data.content,encoding='utf-8')
+    except Exception as e:
+        logger.exception(e)
+
+
 def writefiel(json_str):
     str = json.dumps(json.loads(json_str,encoding='utf-8'),ensure_ascii=False)
     f = open('./test.json','w')

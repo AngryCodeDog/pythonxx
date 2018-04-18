@@ -32,7 +32,7 @@ def reqest_subjetc_photo(img_byte, subject_id=None, photo_id=None, rect={}):
         files = {'photo': ('filename.jpg', img_byte)}
         data = requests.post(
             url, data=params, headers=headers, files=files).json()
-        logger.info(data)
+        # logger.info(data)
         if data.get('code',-1) == 0:
             return succeed_result(data={"subject_id":subject_id,"photo_id":data['data']['id']})
         return data
@@ -41,17 +41,17 @@ def reqest_subjetc_photo(img_byte, subject_id=None, photo_id=None, rect={}):
     return error_result()
 
 
-def import_subject(subject_type, name, gender, department, title, mark, photo_ids, phone):
+def import_subject(data):
     url = BASE_URL + '/subject'
-    data = {'subject_type': subject_type, 'name': name,
-            'gender': gender, 'photo_ids': photo_ids,
-            'department': department, 'title': title,
-            'remark': mark, 'phone': phone}
+    # data = {'subject_type': subject_type, 'name': name,
+    #         'gender': gender, 'photo_ids': photo_ids,
+    #         'department': department, 'title': title,
+    #         'remark': mark, 'phone': phone}
     ret = None
 
     logger.info(json.dumps(data))
     try:
-        ret = requests.post(url, headers=headers, json=data).content
+        ret = requests.post(url, json=data,headers=headers).content
         data = json.loads(ret)
         return data
     except Exception as e:
@@ -109,17 +109,20 @@ def req_update_subject(subject_id,req_data):
         # params = {'name':req_data.get('name',''),'title':req_data.get('title',''),
         # 'department':req_data.get('company',''),'phone':req_data.get('phone',''),
         # 'gender':req_data.get('gender',0),'remark':req_data.get('course',''),'photo_ids':req_data.get('photo_ids',[])}
-        params = get_update_subject_params(req_data)
+        params = get_subject_params(req_data)
         logger.info(json.dumps(params))
         data = requests.put(url,json=params,headers=headers).json()
         print data
-        return data
+        if data['code'] == 0:
+            return succeed_result(data=get_subject_brief_info(data['data']))
+        else:
+            return data
     except Exception as e:
         logger.exception(e)
     return error_result()
 
 
-def get_update_subject_params(req_data):
+def get_subject_params(req_data):
     params = {}
     for key,value in req_data.items():
         if key == 'company':

@@ -15,8 +15,8 @@ reload(sys)
 sys.setdefaultencoding('utf-8')
 
 
-# IP = '119.23.238.194'
-IP = '127.0.0.1'
+IP = '119.23.238.194'
+# IP = '127.0.0.1'
 PORT = 21356
 
 
@@ -84,7 +84,7 @@ def handle_request(req_data):
     elif req_data['type'] == 'get_subject':
         return req_subject_info(req_data['data']['subject_id'])
     elif req_data['type'] == 'update_subject':
-        return update_subject(req_data)
+        return req_update_subject(req_data['data']['subject_id'],req_data['data'])
     elif req_data['type'] == 'update_photo':
         return reqest_subjetc_photo(base64.b64decode(req_data['data']['photo_base64str']),
                                             req_data['data']['subject_id'],
@@ -100,14 +100,18 @@ def req_subject(msg):
     data = reqest_subjetc_photo(image_byte)  # 请求盒子 判断识别照片
     result = {}
     if data.get('code',None) == 0:
-        # 去注册信息
+        # 去注册个人信息
         logger.info('to import subject')
-        subject_data = import_subject(0, msg.get('name',''), msg.get('gender', 0), msg.get(
-            'company', ''), msg.get('title', ''), msg.get('remark', ''), [data['data']['photo_id']], msg.get('phone', ''))
+        msg['photo_base64str'] = ''
+        msg['subject_type'] = 0
+        msg['photo_ids'] = [data['data']['photo_id']]
+        subject_data = import_subject(get_subject_params(msg))
+        # subject_data = import_subject(0, msg.get('name',''), msg.get('gender', 0), msg.get(
+            # 'company', ''), msg.get('title', ''), msg.get('remark', ''), [data['data']['photo_id']], msg.get('phone', ''))
         if subject_data['code'] == 0:
             result = succeed_result(data=get_subject_brief_info(subject_data['data']))
         else:
-            result = data
+            result = subject_data
         logger.info(json.dumps(result))
         return result
     else:
@@ -122,15 +126,6 @@ def req_recognize(req_data):
     elif data.get('recognized',None) == False:
         return succeed_result(desc='not found')
     else: # 其他错误信息直接返回
-        return data
-
-def update_subject(req_data):
-    # 更新人物信息
-    data = {}
-    data_temp = req_update_subject(req_data['data']['subject_id'],req_data['data'])
-    if data_temp['code'] == 0:
-        return succeed_result(data=get_subject_brief_info(data_temp['data']))
-    else:
         return data
 
 def client():
