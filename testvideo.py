@@ -5,6 +5,8 @@ import requests
 import json
 from StringIO import StringIO
 import threading
+import Tkinter as tk
+from PIL import ImageTk, Image
 
 
 def recognize(img_byte):
@@ -33,7 +35,7 @@ def save_to_jpeg(im):
     return buf
 
 
-def createvideocapture():
+def createvideocapture(panel):
     cap = cv2.VideoCapture(0)
     c = 1
     # fps = cap.get(cv2.CAP_PROP_FPS)
@@ -43,11 +45,16 @@ def createvideocapture():
 
     while(1):    # get a frame
         ret, frame = cap.read()    # show a frame
-        cv2.imshow("capture", frame)
+        # cv2.imshow("capture", frame)
+        ndarray_convert_img = Image.fromarray(frame)
+        imagetk = ImageTk.PhotoImage(ndarray_convert_img)
+        panel.configure(image=imagetk)
+        panel.image = imagetk
         if c % timeF == 0:
-            thread = threading.Thread(target=handle_recognize, args=(frame,))
-            thread.start()
+            # thread = threading.Thread(target=handle_recognize, args=(frame,))
+            # thread.start()
             # handle_recognize(frame)
+            print 'recognize'
         c = c + 1
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -68,8 +75,45 @@ def handle_recognize(frame):
         print data
 
 
+def createTkinterPanel():
+    # 创建一个窗口
+    window = tk.Tk()
+    # 配置窗口
+    window.title("Join")
+    window.geometry("600x600")
+    window.configure(background='grey')
+    # 添加一个图片组件
+    path = 'timg.jpeg'
+    img = ImageTk.PhotoImage(Image.open(path))
+    panel = tk.Label(window, image=img)
+    # 创建一个Button组件
+    btn = tk.Button(window, text="Snapshot!", command=takeSnapshot)
+
+    # 对组件进行布局设置，pack布局
+    panel.pack(side="top", padx=10, pady=10)
+    btn.pack(side="bottom", padx=10, pady=10)
+
+    thread = threading.Thread(target=createvideocapture,args=(panel,))
+    thread.start()
+    # Start the GUI
+    window.mainloop()
+
+def takeSnapshot():
+    # grab the current timestamp and use it to construct the
+    # output path
+    # ts = datetime.datetime.now()
+    # filename = "{}.jpg".format(ts.strftime("%Y-%m-%d_%H-%M-%S"))
+    # p = os.path.sep.join((self.outputPath, filename))
+
+    # # save the file
+    # cv2.imwrite(p, self.frame.copy())
+    # print("[INFO] saved {}".format(filename))
+    print 'click btn'
+
+
 if __name__ == '__main__':
         # image = Image.open('tt.jpg')
         # data = recognize(image.tobytes())
         # print data
-    createvideocapture()
+    # createvideocapture()
+    createTkinterPanel()
