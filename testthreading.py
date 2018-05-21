@@ -14,20 +14,32 @@ import threadpool
 import imutils
 import tkFont
 
+
 face_patterns = cv2.CascadeClassifier('/usr/local/opt/opencv/share/OpenCV/haarcascades/haarcascade_frontalface_default.xml')
 
+SHOW_RECOGNIZE_WINDOW = 101
+SHWO_STRANGER_WINDOW = 102
+CLOSE_RECOGNIZE_WINDOW = 100
 
-def testthread2(frame):
+
+def thread_recoginze(frame):
     ndarray_convert_img = Image.fromarray(frame)
     image_buf = save_to_jpeg(ndarray_convert_img)
     data = recognize(image_buf.getvalue())
-    print data
+    logger.info(data)
+    img_resize = ndarray_convert_img.resize((300, 300))
+    imagetk = ImageTk.PhotoImage(img_resize)
+    msg = Message()
     if data['code'] == 0 and data['data'].get('name', None) != None:
-        pba.second_windows.show_window(u'已匹配' + data['data']['name'])
+        # pba.second_windows.show_window(data['data'], imagetk)
+        msg = Message(SHOW_RECOGNIZE_WINDOW, {'data': data['data']})
     else:
-        pba.second_windows.show_window(u'此人不在底库')
+        msg = Message(SHWO_STRANGER_WINDOW, {'data': {}})
 
-    print threading.current_thread().name + 'complete'
+    msg.img = imagetk
+    my_message_queue.put_msg(msg)
+
+    logger.info(threading.current_thread().name + 'complete')
 
 
 def recognize(img_byte):
@@ -52,16 +64,19 @@ def save_to_jpeg(im):
 
 def get_face(ndarray_img):
     """ 检测人脸并绘制脸部矩形框 """
+    # BGR转RGB恢复正常色调，不然有点显蓝色
+    ndarray_rgb = cv2.cvtColor(ndarray_img, cv2.COLOR_BGR2RGB)
+    # 转成灰度图片，更易识别人脸
     gray = cv2.cvtColor(ndarray_img, cv2.COLOR_BGR2GRAY)
     faces = face_patterns.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=3, minSize=(100, 100))
     detect = False
     face_img_list = []
     for (x, y, w, h) in faces:
-        cv2.rectangle(ndarray_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        face_img_list.append(ndarray_img[y: y + h, x: x + w])
+        cv2.rectangle(ndarray_rgb, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        face_img_list.append(ndarray_rgb[y: y + h, x: x + w])
         detect = True
 
-    result = {"detect": detect, "data": face_img_list, "frame": ndarray_img}
+    result = {"detect": detect, "data": face_img_list, "frame": ndarray_rgb}
     return result
 
 
@@ -80,7 +95,6 @@ class PhotoBoothApp:
 
         self.panel = tk.Label(self.root)
         self.panel.pack(side="top", padx=10, pady=10)
-        ft = tkFont.Font(size=60, weight=tkFont.BOLD)
 
         self.stopEvent = threading.Event()
 
@@ -102,18 +116,19 @@ class PhotoBoothApp:
                 detect_data = get_face(self.frame)
                 self.frame = detect_data['frame']
                 if self.cur_frame_num % self.timeF == 0 and detect_data['detect']:
-                    reqs = threadpool.makeRequests(testthread2, detect_data['data'])
+                    reqs = threadpool.makeRequests(thread_recoginze, detect_data['data'])
                     [pool.putRequest(req) for req in reqs]
                 self.cur_frame_num += 1
 
                 self.change_image()
+                my_message_queue.loop_queue()
                 self.panel.after(50, self.videoLoop)
         except RuntimeError, e:
             print("[INFO] caught a RuntimeError")
 
     def change_image(self):
-        ndarray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-        ndarray_2_image = Image.fromarray(ndarray)
+        # ndarray = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
+        ndarray_2_image = Image.fromarray(self.frame)
         imagetk = ImageTk.PhotoImage(ndarray_2_image)
         if self.panel is None:
             self.panel = tk.Label(image=imagetk)
@@ -123,8 +138,8 @@ class PhotoBoothApp:
             self.panel.configure(image=imagetk)
             self.panel.image = imagetk
 
-    def change_text(self, text):
-        self.info_label.configure(text=text)
+    def show_root_window(self):
+        self.root.mainloop()
 
     def onClose(self):
         print("[INFO] closing...")
@@ -139,51 +154,52 @@ class SecondWindow(object):
 
     def __init__(self):
         super(SecondWindow, self).__init__()
-        self.window_list = []
-        self.width = 500
-        self.height = 100
+        self.windows_dict = {}
+        self.width = 310
+        self.height = 400
+        self.current_toplevel = '-1'
 
-    def show_window(self, text):
-
+    def show_window(self, text, imagetk):
+        # 创建一个子窗口
         top = tk.Toplevel()
         top.overrideredirect(True)
-        top.attributes("-alpha", 0.9)
-        # canvas = tk.Canvas(top)
-        # canvas.configure(width=500, height=200, bg='green', highlightthickness=0)
-        # canvas.pack()
-        srcw, srch = top.maxsize()
-        center_x = (srcw - 300) / 2
-        center_y = (srch - 300) / 2
-        locationstr = '%dx%d+%d+%d' % (self.width, self.height, center_x, center_y + 400)
-
+        logger.info(threading.current_thread().name + '--create toplevel addr=' + str(id(top)))
+        # top.attributes("-alpha", 0.9)
+        # 头像标签
+        head_img = tk.Label(top, image=imagetk)
+        head_img.image = imagetk  # 不写这句话图片不显示
+        head_img.pack(side="top", padx=10, pady=10)
+        # 文字标签
         ft = tkFont.Font(size=60, weight=tkFont.BOLD)
         label = tk.Label(top, text=text, font=ft, fg='red')
         label.pack()
-        # print len(self.window_list)
-        # if len(self.window_list) > 0:
-        #     self.move_obj()
-
-        for top_temp in self.window_list:
-            self.closenowait(top_temp)
-
+        # 加入字典中
+        self.windows_dict[self.current_toplevel] = top
+        # 设置top窗口位置
+        srcw, srch = top.maxsize()
+        center_x = (srcw - self.width) / 2
+        center_y = (srch - self.height) / 2
+        locationstr = '%dx%d+%d+%d' % (self.width, self.height, center_x, center_y)
+        logger.info('show window and size&location:' + locationstr)
         top.geometry(locationstr)
-        self.window_list.append(top)
-        threading.Thread(target=self.closetop, args=(top,)).start()
-        top.mainloop()
+        # 3s后去自动关闭该弹窗
+        top.after(3000, self.close_top, self.current_toplevel)
 
-    def closetop(self, top_temp):
-        time.sleep(2)
-        self.closenowait(top_temp)
+    # def close_top(self, top_key):
+    #     time.sleep(3)
+    #     logger.info(threading.current_thread().name + '--prepare to closeing window')
+    #     msg = Message(CLOSE_RECOGNIZE_WINDOW, {'key': top_key})
+    #     my_message_queue.put_msg(msg)
 
-    def closenowait(self, top_temp):
+    def close_top(self, top_key):
         try:
-            if top_temp in self.window_list:
-                print 'remove'
-                self.window_list.remove(top_temp)
-                if top_temp.winfo_exists():
-                    top_temp.destroy()
+            # logger.info(threading.current_thread().name + '--close current toplevel--' + 'top_key=' + top_key + '--' + str(self.windows_dict))
+            if top_key in self.windows_dict.keys():  # key是否存在
+                self.windows_dict[top_key].destroy()
+                self.windows_dict.pop(top_key)
+                # logger.info(threading.current_thread().name + '--close current toplevel completed!!')
         except Exception as e:
-            pass
+            print e
 
     def move_obj(self):
         try:
@@ -191,14 +207,79 @@ class SecondWindow(object):
                 # 获取弹窗位置
                 x = top_temp.winfo_x()
                 y = top_temp.winfo_y()
-                locationstr = '%dx%d+%d+%d' % (self.width, self.height, x - 310, y)
+                locationstr = '%dx%d+%d+%d' % (self.width, self.height, x - self.width - 10, y)
                 top_temp.geometry(locationstr)
         except Exception as e:
             raise e
 
 
+class MessageQueue(object):
+    """主线程消息队列"""
+
+    def __init__(self):
+        super(MessageQueue, self).__init__()
+        self.queue = Queue()
+
+    def loop_queue(self):
+        # while True:
+        if not self.queue.empty():
+            msg = self.queue.get()
+            my_handler.handle_message(msg)
+
+    def put_msg(self, msg):
+        self.queue.put(msg)
+
+
+class Message(object):
+    """message"""
+
+    def __init__(self, what=None, content=None):
+        super(Message, self).__init__()
+        self.what = what
+        self.content = content
+        self.img = None
+
+
+class HandlerMsg(object):
+    """消息处理类"""
+
+    def __init__(self):
+        super(HandlerMsg, self).__init__()
+
+    def handle_message(self, msg):
+        # 处理线程的消息，如创建弹窗，消失弹窗
+        # logger.info(threading.current_thread().name + '--msg.what = ' + str(msg.what))
+        cur_key = ''
+        args = ()
+        imagetk = msg.img
+        if msg.what == SHOW_RECOGNIZE_WINDOW:
+            cur_key = str(msg.content['data'].get('subject_id', -1)) + msg.content['data']['name']
+            args = (msg.content['data']['name'], imagetk)
+        elif msg.what == SHWO_STRANGER_WINDOW:
+            cur_key = '-1'
+            args = (u'陌生人', imagetk)
+        elif msg.what == CLOSE_RECOGNIZE_WINDOW:
+            second_windows.close_top(second_windows.current_toplevel)
+            return
+
+        if cur_key in second_windows.windows_dict.keys():
+            # 如果当前的key关联的窗口还存在，就不要重新新建了
+            return
+        # 显示新窗口前，把旧窗口关掉
+        second_windows.close_top(second_windows.current_toplevel)
+        # 当前窗口key重新更换，再显示新窗口
+        second_windows.current_toplevel = cur_key
+        second_windows.show_window(args[0], args[1])
+
+
+my_handler = HandlerMsg()
+my_message_queue = MessageQueue()
+
+
 pool = threadpool.ThreadPool(10)
 pba = PhotoBoothApp()
+second_windows = SecondWindow()
+
 
 if __name__ == '__main__':
     cap = cv2.VideoCapture(0)
