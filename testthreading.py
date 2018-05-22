@@ -203,7 +203,7 @@ class SecondWindow(object):
 
     def move_obj(self):
         try:
-            for top_temp in self.window_list:
+            for top_temp in self.windows_dict:
                 # 获取弹窗位置
                 x = top_temp.winfo_x()
                 y = top_temp.winfo_y()
