@@ -3,7 +3,7 @@ import os,sys
 import base64
 import json
 import requests
-import time
+import time,datetime
 from logger import logger
 from error_code import ErrorCode
 
@@ -17,7 +17,6 @@ headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36",
     "host": "192.168.1.50",
     "referer": "http://192.168.1.50/",
-    "cookie": "session=409601e0-0028-4bc8-bb77-299212af41ab",
 }
 
 BASE_URL = 'http://192.168.1.50'
@@ -33,6 +32,17 @@ class Requtil(object):
         # self.s.proxies={'aa'}
         # 如果后续headers有改变，再次赋值就可以了。
         # self.s.get(url, params, headers=new_headers)
+    
+    def login(self):
+        url = BASE_URL + '/auth/login'
+        self.req.headers.update({'User-Agent': 'Koala Admin'})
+        data = {'username': 'ztd@megvii.com', 'password': '123456'}
+        ret = self.req.post(url,json=data)
+        result = json.loads(ret.content)
+        if result['code'] == 0:
+            logger.info('login succeed')
+        else:
+            logger.info(ret.content)
 
     def reqest_subjetc_photo(self,img_byte, subject_id=None, photo_id=None, rect={}):
         try:
@@ -81,6 +91,7 @@ class Requtil(object):
             url = BASE_URL + '/subject/'+str(subject_id)
             data_temp = self.req.get(url).json()
             data = {}
+            print data_temp
             if data_temp['code'] == 0:
                 return self.succeed_result(data=self.get_subject_brief_info(data_temp['data']))
             else:
@@ -161,6 +172,22 @@ class Requtil(object):
         except Exception as e:
             logger.exception(e)
         return self.error_result()
+    
+    def req_sync_event(self,base64img,quality,confidence,subject_id):
+        # image = requtil.jpg_to_base64str('zyp2.jpg')
+        event_data = {
+                'screen_token': '3cd9332a-d220-413c-b325-0c199f36cc9a',
+                'photo': base64img,
+                'age': -1,
+                'gender': 1,
+                'group': -1,
+                'short_group': -1,
+                'quality': quality,
+                'confidence': confidence,
+                'event_type': 0,
+                'subject_id': subject_id
+        }
+        requests.post('http://192.168.1.50/sync/event',data=event_data)
 
 
     def get_subject_brief_info(self,subject):
@@ -174,6 +201,28 @@ class Requtil(object):
         result_content['remark'] = subject['remark']
         result_content['photo_id'] = subject['photos'][0]['id']
         return result_content
+
+    def req_records(self,subject_id):
+        """
+        * clock_in, clock_out 状态值：
+        - 0 表示上午/下午未打卡
+        - 1 表示按时打卡
+        - 2 表示迟到
+        - 3 表示早退
+        - check_in_time 最早签到记录
+        - check_out_time 最晚签到记录
+        - worktime 工作时间
+        - id 
+        - date 
+        """
+        url = 'http://192.168.1.50/attendance/records/monthly'
+        today = datetime.date.today()  
+        today_str = today.strftime('%Y-%m')
+        params = {'subject_id':subject_id,'date':today_str,'_':int(time.time())}
+        data = requests.get(url,params=params,headers=headers)
+        result = json.loads(data.content)
+        today_num = int(today.strftime('%d')) -1
+        print result['data']['records'][today_num]
 
 
 

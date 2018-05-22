@@ -1,6 +1,6 @@
 #! encoding=utf-8
 import requests
-import json,time
+import json,time,datetime
 from logger import logger
 from utils import requtil
 
@@ -16,7 +16,7 @@ headers = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36",
     "host": "192.168.1.50",
     "referer": "http://192.168.1.50/",
-    "cookie": "session=2707e5e7-ec43-45ee-ba1c-f49b0495e80a",
+    "cookie": "session=409601e0-0028-4bc8-bb77-299212af41ab",
 }
 
 def req_recognize():
@@ -119,7 +119,7 @@ def req_sync_event():
     image = requtil.jpg_to_base64str('zyp2.jpg')
 
     event_data = {
-            'screen_token': '1',
+            'screen_token': '3cd9332a-d220-413c-b325-0c199f36cc9a',
             'photo': image,
             'age': 24,
             'gender': 1,
@@ -128,11 +128,36 @@ def req_sync_event():
             'quality': 0.975,
             'confidence': 89.99987,
             'event_type': 0,
-            'subject_id':58
+            'subject_id':None
         }
     data = requests.post('http://192.168.1.50/sync/event',data=event_data)
     print data.content
 
 
+def req_records():
+    """
+    * clock_in, clock_out 状态值：
+    - 0 表示上午/下午未打卡
+    - 1 表示按时打卡
+    - 2 表示迟到
+    - 3 表示早退
+    - check_in_time 最早签到记录
+    - check_out_time 最晚签到记录
+    - worktime 工作时间
+    - id 
+    - date 
+    """
+    url = 'http://192.168.1.50/attendance/records/monthly'
+    today = datetime.date.today()  
+    today_str = today.strftime('%Y%m')
+    params = {'subject_id':58,'date':today_str,'_':int(time.time())}
+    data = requests.get(url,params=params,headers=headers)
+    print data.content
+    result = json.loads(data.content)
+    today_num = int(today.strftime('%d')) -1
+    print result['data']['records'][today_num]
+
+
 if __name__ == "__main__":
-    req_sync_event()
+    requtil.login()
+    requtil.req_subject_info(58)

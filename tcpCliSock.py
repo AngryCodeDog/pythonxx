@@ -10,6 +10,8 @@ from logger import logger
 
 from error_code import ErrorCode
 from utils import requtil
+from clientopt import client_handler
+
 import threading
 reload(sys)
 sys.setdefaultencoding('utf-8')
@@ -59,7 +61,7 @@ class ClientServer(object):
                         continue
 
                     # 这里是要做请求主机盒子的操作之后再返回信息的，所以这里又是一个阻塞操作
-                    box_res = self.handle_request(result)
+                    box_res = client_handler.handle_request(result)
                     self.sock.sendall(json.dumps(box_res))
                     data = ''
         except Exception as e:
@@ -70,10 +72,10 @@ class ClientServer(object):
             time.sleep(2)
             self.recv_msg()
 
-
+    '''
     def handle_request(self,req_data):
         """
-        判断是要去注册还是识别个人
+        #判断是要去注册还是识别个人
         """
 
         logger.info('handle_request: ' + req_data.get('type',''))
@@ -126,30 +128,35 @@ class ClientServer(object):
         data = requtil.recognize(base64.b64decode(req_data['data']['photo_base64str']))
         if data.get('recognized',None) == True: # 如果有recognize信息，并且为ture，则识别成功
             logger.info('recognized and req person info---' + str(data['person']['id']))
+            # 识别同时发送识别记录事件
+            requtil.req_sync_event(req_data['data']['photo_base64str'],data['face_info']['quality'],data['person']['confidence'],data['person']['id'])
             return requtil.req_subject_info(data['person']['id'])
         elif data.get('recognized',None) == False:
+            # 识别同时发送识别记录事件
+            requtil.req_sync_event(req_data['data']['photo_base64str'],data['face_info']['quality'],data['person']['confidence'],None)
             return requtil.succeed_result(desc='not found')
         else: # 其他错误信息直接返回
             return data
-
+    '''
 
 def client():
-    tt = threading.Thread(target=loop_req_list,args=())
-    tt.daemon = True
-    tt.start()
+    # tt = threading.Thread(target=loop_req_list,args=())
+    # tt.daemon = True
+    # tt.start()
 
+    # requtil.login()
     client_server = ClientServer()
     client_server.recv_msg()
     
 
-def loop_req_list():
-    while True:
-        try:
-            time.sleep(60*60)
-            logger.info('req subject list')
-            requtil.req_subject_list()
-        except Exception as e:
-            print e
+# def loop_req_list():
+#     while True:
+#         try:
+#             time.sleep(60*60)
+#             logger.info('req subject list')
+#             requtil.req_subject_list()
+#         except Exception as e:
+#             print e
 
 if __name__ == '__main__':
     client()
