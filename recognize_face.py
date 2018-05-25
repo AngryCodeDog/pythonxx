@@ -8,7 +8,8 @@ import imutils
 import tkFont
 import dlib
 import cv2
-#  time
+import time
+import datetime
 import Tkinter as tk
 
 from PIL import Image, ImageTk
@@ -18,11 +19,11 @@ from StringIO import StringIO
 
 
 # opencv脸部检测默认数据集
-face_patterns = cv2.CascadeClassifier('/usr/local/opt/opencv/share/OpenCV/haarcascades/haarcascade_frontalface_default.xml')
+face_patterns = cv2.CascadeClassifier('./recognizedata/haarcascade_frontalface_default.xml')
 # dlib脸部检测
 detector = dlib.get_frontal_face_detector()
 # dlib脸部68个特征点检测数据集
-landmark_predictor = dlib.shape_predictor('/Users/zyp/Downloads/shape_predictor_68_face_landmarks.dat')
+landmark_predictor = dlib.shape_predictor('./recognizedata/shape_predictor_68_face_landmarks.dat')
 
 SHOW_RECOGNIZE_WINDOW = 101
 SHWO_STRANGER_WINDOW = 102
@@ -31,6 +32,9 @@ CLOSE_RECOGNIZE_WINDOW = 100
 # 控制显示矩形框内直线运动
 cur_line_y = 8
 
+face_point_line_broken = [17, 22, 27, 31, 36, 42, 48]
+
+weekdays = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六']
 
 def thread_recoginze(frame):
     """ 请求识别处理 """
@@ -84,21 +88,20 @@ def get_face_point(ndarray_rgb):
     """ 检测人脸并绘制脸部矩形框和特征点 """
     # 转成灰度图片，更易识别人脸
     gray = cv2.cvtColor(ndarray_rgb, cv2.COLOR_RGB2GRAY)
-    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100, 100))
+    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.5, minNeighbors=5, minSize=(100, 100))
     detect = False  # 是否检测到人脸
     face_img_list = []  # 人脸数据数据
     for (x, y, w, h) in faces:
         # 绘制脸部矩形
-        cv2.rectangle(ndarray_rgb, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        draw_eight_line(ndarray_rgb, x, y, x+w, y+h)
         # 截图保存去请求识别(numpy里面要保存切片的副本，不然会受后面代码的影响)
-        face_img_list.append(ndarray_rgb[y: y+h, x: x+w].copy())
+        # face_img_list.append(ndarray_rgb[y: y+h, x: x+w].copy())
         # 在脸部框里面绘制动画线条
         ndarray_rgb = draw_line_in_rect(ndarray_rgb, x, y, x + w, y + h)
         # 绘制人脸特征点,减少计算次数，2帧描绘一次
         if cur_line_y % 16 == 0:
             shape = landmark_predictor(ndarray_rgb, dlib.rectangle(x, y, x + w, y + h))
-            for i in range(68):
-                cv2.circle(ndarray_rgb, (shape.part(i).x, shape.part(i).y), 1, (0, 255, 0), -1, 8)
+            draw_face_point_line(ndarray_rgb, shape)
         detect = True
 
     result = {"detect": detect, "data": face_img_list, "frame": ndarray_rgb}
@@ -110,11 +113,40 @@ def draw_line_in_rect(img_ndrray, x1, y1, x2, y2):
     global cur_line_y
     if y1 + cur_line_y > y1 and y1 + cur_line_y < y2:
         # 画线
-        cv2.line(img_ndrray, (x1 + 1, y1 + cur_line_y), (x2 - 1, y1 + cur_line_y), (0, 255, 0), 4)
+        # cv2.line(img_ndrray, (x1 + 1, y1 + cur_line_y), (x2 - 1, y1 + cur_line_y), (0, 255, 0), 4)
         cur_line_y += 8
     else:
         cur_line_y = 8
     return img_ndrray
+
+
+def draw_eight_line(img,x1,y1,x2,y2):
+    line_length = (x2-x1)/4
+    line_width = 2
+    line_color = (0, 255,0)
+
+    cv2.line(img, (x1,y1), (x1+line_length,y1), line_color, line_width)
+    cv2.line(img, (x2-line_length, y1), (x2, y1), line_color, line_width)
+
+    cv2.line(img, (x1, y2), (x1 + line_length, y2), line_color, line_width)
+    cv2.line(img, (x2 - line_length, y2), (x2, y2), line_color, line_width)
+
+    cv2.line(img, (x1, y1), (x1, y1 + line_length), line_color, line_width)
+    cv2.line(img, (x1, y2 - line_length), (x1, y2), line_color, line_width)
+
+    cv2.line(img, (x2, y1), (x2, y1 + line_length), line_color, line_width)
+    cv2.line(img, (x2, y2 - line_length), (x2, y2), line_color, line_width)
+
+
+def draw_face_point_line(img, shape):
+    line_width = 1
+    line_color = (0, 255, 0)
+    for i in range(68):
+        cv2.circle(img, (shape.part(i).x, shape.part(i).y), 2, (1,187,254), -1, 8)
+        if i + 1 < 68:
+            if i + 1 in face_point_line_broken:
+                continue
+            cv2.line(img, (shape.part(i).x, shape.part(i).y), (shape.part(i + 1).x, shape.part(i + 1).y),line_color, line_width)
 
 
 def get_face(ndarray_img):
@@ -144,22 +176,17 @@ class PhotoBoothApp:
 
         # 创建根窗口
         self.root = tk.Tk()
+
         # self.root.attributes("-transparentcolor", "white")
         # self.root["background"] = "white"
         parent_w, parent_h = self.root.maxsize()  # 获取屏幕大小
+        self.width = parent_w
+        self.height = parent_h
         locationstr = '%dx%d+%d+%d' % (self.width, self.height, (parent_w - self.width) / 2, (parent_h - self.height) / 2)
         self.root.geometry(locationstr)
-        # 设置视频帧面板
-        self.frame_left = tk.Frame(self.root)
-        self.panel = tk.Label(self.frame_left)
-        self.panel.pack()
-        self.frame_left.pack(side="left", fill=tk.Y)
 
-        # 创建右边照片墙面板
-        self.frame_right = tk.Frame(self.root)
-        self.frame_right_label = tk.Label(self.frame_right)
-        self.frame_right_label.pack()
-        self.frame_right.pack(side="right", fill=tk.Y)
+        self.init_top_frame()
+        self.init_bottom_frame()
 
         self.stopEvent = threading.Event()
 
@@ -173,13 +200,58 @@ class PhotoBoothApp:
 
         self.videoLoop()
 
+    def init_top_frame(self):
+        self.top_frame = tk.Frame(self.root)
+        # 设置视频帧面板
+        self.frame_left = tk.Frame(self.top_frame)
+        self.panel = tk.Label(self.frame_left)
+        self.panel.pack()
+        self.frame_left.grid(row=0,column=1,columnspan=2,sticky=tk.W)
+
+        # 创建右边面板
+        self.init_top_right_frame()
+
+        self.top_frame.grid(row=0,column=1)
+
+    def init_top_right_frame(self):
+        self.top_right_frame = tk.Frame(self.top_frame)
+
+        image = Image.open('./recognizedata/logo.png')
+        image_size = image.resize((self.width/5, self.height/5))
+        image = ImageTk.PhotoImage(image_size)
+        logo_label = tk.Label(self.top_right_frame, image=image)
+        logo_label.image = image
+        date_label = tk.Label(self.top_right_frame)
+        des_label = tk.Label(self.top_right_frame, text='企业简介', font=tkFont.Font(size=50, weight=tkFont.BOLD))
+
+        d = datetime.datetime.now()
+        weekday_str = weekdays[d.weekday()]
+
+        ft = tkFont.Font(size=30, weight=tkFont.BOLD)
+        date_label.configure(text=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()) + '\r\n' + weekday_str, font=ft, fg='green')
+
+        logo_label.grid(row=0,column=1)
+        date_label.grid(row=0,column=2)
+        des_label.grid(row=1,columnspan=4)
+
+        self.top_right_frame.grid(row=0, column=3, sticky=tk.W + tk.E + tk.N + tk.S, padx=100)
+
+    def init_bottom_frame(self):
+        self.bottom_frame = tk.Frame(self.root)
+        ft = tkFont.Font(size=60, weight=tkFont.BOLD)
+        label = tk.Label(self.bottom_frame, text='底部模块', font=ft, fg='red')
+        label.pack()
+        self.bottom_frame.grid(row=1,column=1)
+
+
     def videoLoop(self):
         try:
             if not self.stopEvent.is_set():
                 tt, self.frame = self.vs.read()
                 # BGR转RGB恢复正常色调，不然视频画面偏蓝色
                 self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-                self.frame = imutils.resize(self.frame, width=self.width-310)
+                # self.frame = cv2.resize(self.frame, (self.width*2/3, self.height*2/3))
+                self.frame = imutils.resize(self.frame, width=self.width/2)
                 detect_data = get_face_point(self.frame)
                 self.frame = detect_data['frame']
                 if self.cur_frame_num % self.timeF == 0 and detect_data['detect']:
@@ -325,8 +397,8 @@ class HandlerMsg(object):
         if msg.what == SHOW_RECOGNIZE_WINDOW:
             cur_key = str(msg.content['data'].get('subject_id', -1)) + msg.content['data']['name']
             args = (msg.content['data']['name'], imagetk)
-            second_windows.show_transparency(msg.content['data']['name'], imagetk)
-            # pba.show_right_panel(imagetk)
+            # second_windows.show_transparency(msg.content['data']['name'], imagetk)
+            pba.show_right_panel(imagetk)
         elif msg.what == SHWO_STRANGER_WINDOW:
             cur_key = '-1'
             args = (u'陌生人', imagetk)
