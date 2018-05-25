@@ -3,6 +3,10 @@ import requests
 import json
 import time
 import datetime
+import cv2
+import dlib
+import Tkinter as tk
+from PIL import Image, ImageTk
 from logger import logger
 from reqbox.utils import requtil
 
@@ -166,8 +170,7 @@ def req_records():
 
 
 def testdlib():
-    import cv2
-    import dlib
+
     detector = dlib.get_frontal_face_detector()
     landmark_predictor = dlib.shape_predictor('/Users/zyp/Downloads/shape_predictor_68_face_landmarks.dat')
     img = cv2.imread('/Users/zyp/workspace/pythontest/twoperson.jpg')
@@ -185,8 +188,41 @@ def testdlib():
                 cv2.circle(img, (shape.part(i).x, shape.part(i).y), 2, (0, 255, 0), -1, 8)
                 # cv2.putText(img,str(i),(shape.part(i).x,shape.part(i).y),cv2.FONT_HERSHEY_SIMPLEX,0.5,(255,2555,255))
     cv2.imshow('Frame', img)
-    cv2.waitKey(0)
+    cv2.waitKey(10)
+
+
+def get_face():
+    root = tk.Tk()
+    root.wm_attributes('-topmost', 1)
+
+    ndarray_img = cv2.imread('/Users/zyp/Downloads/cartoon_robot_face.jpg')
+    # 转成灰度图片，更易识别人脸
+    gray = cv2.cvtColor(ndarray_img, cv2.COLOR_BGR2GRAY)
+    face_patterns = cv2.CascadeClassifier('/usr/local/opt/opencv/share/OpenCV/haarcascades/haarcascade_frontalface_default.xml')
+    landmark_predictor = dlib.shape_predictor('/Users/zyp/Downloads/shape_predictor_68_face_landmarks.dat')
+    logger.info('pre detect')
+    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=9, minSize=(100, 100))
+    logger.info('end detect')
+    for (x, y, w, h) in faces:
+        cv2.rectangle(ndarray_img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        shape = landmark_predictor(gray, dlib.rectangle(x, y, x + w, y + h))
+        for i in range(68):
+            cv2.circle(ndarray_img, (shape.part(i).x, shape.part(i).y), 5, (0, 255, 0), -1, 8)
+
+    ndarray_convert_img = Image.fromarray(ndarray_img)
+    imagetk = ImageTk.PhotoImage(ndarray_convert_img)
+    label = tk.Label(root, image=imagetk)
+    label.pack()
+    root.mainloop()
+
+
+def testcvvideo():
+    vs = cv2.VideoCapture(0)
+    while True:
+        t, frame = vs.read()
+        cv2.imshow('Frame', frame)
+        cv2.waitKey(10)
 
 
 if __name__ == "__main__":
-    testdlib()
+    testcvvideo()

@@ -2,18 +2,20 @@
 
 import threading
 import json
+import requests
+import threadpool
+import imutils
+import tkFont
+import dlib
+import cv2
 #  time
 import Tkinter as tk
-import cv2
+
 from PIL import Image, ImageTk
 from logger import logger
 from Queue import Queue
 from StringIO import StringIO
-import requests
-import threadpool
-# import imutils
-import tkFont
-import dlib
+
 
 # opencv脸部检测默认数据集
 face_patterns = cv2.CascadeClassifier('/usr/local/opt/opencv/share/OpenCV/haarcascades/haarcascade_frontalface_default.xml')
@@ -82,7 +84,7 @@ def get_face_point(ndarray_rgb):
     """ 检测人脸并绘制脸部矩形框和特征点 """
     # 转成灰度图片，更易识别人脸
     gray = cv2.cvtColor(ndarray_rgb, cv2.COLOR_RGB2GRAY)
-    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=3, minSize=(100, 100))
+    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=3, minSize=(100, 100))
     detect = False  # 是否检测到人脸
     face_img_list = []  # 人脸数据数据
     for (x, y, w, h) in faces:
@@ -119,7 +121,7 @@ def get_face(ndarray_img):
     ndarray_rgb = cv2.cvtColor(ndarray_img, cv2.COLOR_BGR2RGB)
     # 转成灰度图片，更易识别人脸
     gray = cv2.cvtColor(ndarray_img, cv2.COLOR_BGR2GRAY)
-    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=3, minSize=(100, 100))
+    faces = face_patterns.detectMultiScale(gray, scaleFactor=1.6, minNeighbors=5, minSize=(100, 100))
     face_img_list = []
     detect = False
     for (x, y, w, h) in faces:
@@ -137,15 +139,27 @@ class PhotoBoothApp:
         self.frame = None
         self.thread = None
         self.stopEvent = None
+        self.width = 1600
+        self.height = 745
 
         # 创建根窗口
         self.root = tk.Tk()
+        # self.root.attributes("-transparentcolor", "white")
+        # self.root["background"] = "white"
         parent_w, parent_h = self.root.maxsize()  # 获取屏幕大小
-        locationstr = '%dx%d+%d+%d' % (1200, 800, (parent_w - 1200) / 2, (parent_h - 800) / 2)
+        locationstr = '%dx%d+%d+%d' % (self.width, self.height, (parent_w - self.width) / 2, (parent_h - self.height) / 2)
         self.root.geometry(locationstr)
-        # 设置视频帧label
-        self.panel = tk.Label(self.root)
-        self.panel.pack(side="top", padx=10, pady=10)
+        # 设置视频帧面板
+        self.frame_left = tk.Frame(self.root)
+        self.panel = tk.Label(self.frame_left)
+        self.panel.pack()
+        self.frame_left.pack(side="left", fill=tk.Y)
+
+        # 创建右边照片墙面板
+        self.frame_right = tk.Frame(self.root)
+        self.frame_right_label = tk.Label(self.frame_right)
+        self.frame_right_label.pack()
+        self.frame_right.pack(side="right", fill=tk.Y)
 
         self.stopEvent = threading.Event()
 
@@ -165,7 +179,7 @@ class PhotoBoothApp:
                 tt, self.frame = self.vs.read()
                 # BGR转RGB恢复正常色调，不然视频画面偏蓝色
                 self.frame = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-                # self.frame = imutils.resize(self.frame, width=2400)
+                self.frame = imutils.resize(self.frame, width=self.width-310)
                 detect_data = get_face_point(self.frame)
                 self.frame = detect_data['frame']
                 if self.cur_frame_num % self.timeF == 0 and detect_data['detect']:
@@ -176,7 +190,7 @@ class PhotoBoothApp:
                 self.change_image()
                 # 读取消息队列
                 my_message_queue.loop_queue()
-                self.panel.after(100, self.videoLoop)
+                self.root.after(100, self.videoLoop)
         except RuntimeError, e:
             print e
             print("[INFO] caught a RuntimeError")
@@ -191,6 +205,10 @@ class PhotoBoothApp:
         else:
             self.panel.configure(image=imagetk)
             self.panel.image = imagetk
+
+    def show_right_panel(self, imagetk):
+        self.frame_right_label.configure(image=imagetk)
+        self.frame_right_label.image = imagetk
 
     def show_root_window(self):
         self.root.mainloop()
@@ -218,7 +236,7 @@ class SecondWindow(object):
         top = tk.Toplevel()
         top.overrideredirect(True)
         logger.info(threading.current_thread().name + '--create toplevel addr=' + str(id(top)))
-        # top.attributes("-alpha", 0.9)
+        # top.attributes("-alpha", 0.2)
         # 头像标签
         head_img = tk.Label(top, image=imagetk)
         head_img.image = imagetk  # 不写这句话图片不显示
@@ -257,6 +275,13 @@ class SecondWindow(object):
                 top_temp.geometry(locationstr)
         except Exception as e:
             raise e
+
+    def show_transparency(self, text, image):
+        toplevel = tk.Toplevel()
+        canvas = tk.Canvas(toplevel, width=300, height=200)
+        canvas.pack()
+        canvas.create_image(0, 0, image=image)
+        canvas.create_text(50, 10, text=text, font=("Fixdsys", 15, "bold"), fill="yellow")
 
 
 class MessageQueue(object):
@@ -300,6 +325,8 @@ class HandlerMsg(object):
         if msg.what == SHOW_RECOGNIZE_WINDOW:
             cur_key = str(msg.content['data'].get('subject_id', -1)) + msg.content['data']['name']
             args = (msg.content['data']['name'], imagetk)
+            second_windows.show_transparency(msg.content['data']['name'], imagetk)
+            # pba.show_right_panel(imagetk)
         elif msg.what == SHWO_STRANGER_WINDOW:
             cur_key = '-1'
             args = (u'陌生人', imagetk)
